@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from 'react';
 
 // Interfaces
 interface Grid {
+  flat(): unknown;
+  map(arg0: (row: any) => any): number[];
   [key: number]: number[];
 }
 
@@ -39,7 +41,7 @@ class Board2048 {
 
   toString(): string {
     return this.grid
-      .map(row => row.map(val => (val === 0 ? '-' : val)).join('\t'))
+      .map(row => row.map((val: number) => (val === 0 ? '-' : val)).join('\t'))
       .join('\n');
   }
 
@@ -96,7 +98,9 @@ class Board2048 {
   }
 
   shift(direction: number): ShiftResult {
-    let newBoard = new Board2048(this.grid.map(row => [...row]));
+    let newBoard = new Board2048(this.grid.map(function (row): any[] {
+        return [...row];
+      }));
     let changed = false;
 
     for (let i = 0; i < this.size; i++) {
@@ -112,7 +116,7 @@ class Board2048 {
   }
 
   numEmpty(): number {
-    return this.grid.flat().filter(val => val === 0).length;
+    return this.grid.flat().filter((val: number) => val === 0).length;
   }
 
   newTile(): boolean {
@@ -215,7 +219,7 @@ const App: React.FC = () => {
         <h1 className="title">2048 Puzzle</h1>
         <div className="grid-container">
           <div className="grid">
-            {game.getGrid().flat().map((value, index) => (
+            {game.getGrid().flat().map((value: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined, index: Key | null | undefined) => (
               <div key={index} className={`tile tile-${value}`}>
                 {value !== 0 ? value : ''}
               </div>
