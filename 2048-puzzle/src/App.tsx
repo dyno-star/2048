@@ -1,260 +1,244 @@
 import { useState, useEffect } from 'react';
 
-  // Interface for the game grid
-  interface Grid {
-    [key: number]: number[];
+// Interfaces
+interface Grid {
+  [key: number]: number[];
+}
+
+interface AlterLineResult {
+  line: number[];
+  changed: boolean;
+}
+
+interface ShiftResult {
+  board: Board2048;
+  changed: boolean;
+}
+
+// 2048 Game Board Logic
+class Board2048 {
+  static UP = 0;
+  static RIGHT = 1;
+  static DOWN = 2;
+  static LEFT = 3;
+
+  private size: number;
+  private grid: Grid;
+
+  constructor(sizeOrGrid: number | number[][]) {
+    if (typeof sizeOrGrid === 'number') {
+      this.size = sizeOrGrid;
+      this.grid = Array(sizeOrGrid)
+        .fill(null)
+        .map(() => Array(sizeOrGrid).fill(0));
+    } else {
+      this.size = sizeOrGrid.length;
+      this.grid = sizeOrGrid.map(row => [...row]);
+    }
   }
 
-  // Interface for alterOneLine return type
-  interface AlterLineResult {
-    line: number[];
-    changed: boolean;
+  toString(): string {
+    return this.grid
+      .map(row => row.map(val => (val === 0 ? '-' : val)).join('\t'))
+      .join('\n');
   }
 
-  // Interface for shift return type
-  interface ShiftResult {
-    board: Board2048;
-    changed: boolean;
+  extractLine(i: number, vertical: boolean, reverse: boolean): number[] {
+    let line: number[] = vertical
+      ? this.grid.map(row => row[i])
+      : [...this.grid[i]];
+    return reverse ? line.reverse() : line;
   }
 
-  // Board2048 class to handle game logic
-  class Board2048 {
-    static UP: number = 0;
-    static RIGHT: number = 1;
-    static DOWN: number = 2;
-    static LEFT: number = 3;
+  insertLine(line: number[], i: number, vertical: boolean, reverse: boolean): void {
+    let newLine = [...line];
+    if (reverse) newLine.reverse();
+    if (vertical) {
+      for (let j = 0; j < this.size; j++) {
+        this.grid[j][i] = newLine[j];
+      }
+    } else {
+      this.grid[i] = newLine;
+    }
+  }
 
-    private size: number;
-    private grid: Grid;
+  static alterOneLine(line: number[]): AlterLineResult {
+    let changed = false;
+    let newLine = line.filter(val => val !== 0);
+    let result: number[] = [];
+    let i = 0;
 
-    constructor(sizeOrGrid: number | number[][]) {
-      if (typeof sizeOrGrid === 'number') {
-        this.size = sizeOrGrid;
-        this.grid = Array(sizeOrGrid)
-          .fill(null)
-          .map(() => Array(sizeOrGrid).fill(0));
+    while (i < newLine.length) {
+      if (i + 1 < newLine.length && newLine[i] === newLine[i + 1]) {
+        result.push(newLine[i] * 2);
+        i += 2;
+        changed = true;
       } else {
-        this.size = sizeOrGrid.length;
-        this.grid = sizeOrGrid.map(row => [...row]);
+        result.push(newLine[i]);
+        i++;
       }
     }
 
-    // Convert grid to string for display
-    toString(): string {
-      return this.grid
-        .map(row => row.map(val => (val === 0 ? '-' : val)).join('\t'))
-        .join('\n');
+    while (result.length < line.length) {
+      result.push(0);
     }
 
-    // Extract a line (row or column) from the grid
-    extractLine(i: number, vertical: boolean, reverse: boolean): number[] {
-      let line: number[] = [];
-      if (vertical) {
-        for (let j = 0; j < this.size; j++) {
-          line.push(this.grid[j][i]);
-        }
-      } else {
-        line = [...this.grid[i]];
-      }
-      return reverse ? line.reverse() : line;
-    }
-
-    // Insert a line back into the grid
-    insertLine(line: number[], i: number, vertical: boolean, reverse: boolean): void {
-      let newLine = [...line];
-      if (reverse) newLine.reverse();
-      if (vertical) {
-        for (let j = 0; j < this.size; j++) {
-          this.grid[j][i] = newLine[j];
-        }
-      } else {
-        this.grid[i] = newLine;
-      }
-    }
-
-    // Shift one line according to 2048 rules
-    static alterOneLine(line: number[]): AlterLineResult {
-      let changed: boolean = false;
-      let newLine: number[] = line.filter(val => val !== 0); // Remove zeros
-      let result: number[] = [];
-      let i: number = 0;
-
-      // Merge tiles
-      while (i < newLine.length) {
-        if (i + 1 < newLine.length && newLine[i] === newLine[i + 1] && newLine[i] !== 0) {
-          result.push(newLine[i] * 2);
-          i += 2;
-          changed: true;
-        } else {
-          result.push(newLine[i]);
-          i++;
+    if (!changed) {
+      for (let j = 0; j < line.length; j++) {
+        if (line[j] !== result[j]) {
+          changed = true;
+          break;
         }
       }
-
-      // Fill remaining with zeros
-      while (result.length < line.length) {
-        result.push(0);
-      }
-
-      // Check if line changed
-      if (!changed && !line.some((val, idx) => val !== result[idx])) {
-        return { line: result, changed: false };
-      }
-
-      return { line: result, changed: true };
     }
 
-    // Shift the entire board in the given direction
-    shift(direction: number): ShiftResult {
-      let newBoard: Board2048 = new Board2048(this.grid.map(row => [...row]));
-      let changed: boolean = false;
-
-      for (let i = 0; i < this.size; i++) {
-        let vertical: boolean = direction === Board2048.UP || direction === Board2048.DOWN;
-        let reverse: boolean = direction === Board2048.RIGHT || direction === Board2048.DOWN;
-        let line: number[] = newBoard.extractLine(i, vertical, reverse);
-        let result: AlterLineResult = Board2048.alterOneLine(line);
-        newBoard.insertLine(result.line, i, vertical, reverse);
-        if (result.changed) changed = true;
-      }
-
-      return { board: newBoard, changed };
-    }
-
-    // Count empty tiles
-    numEmpty(): number {
-      return this.grid.flat().filter(val => val === 0).length;
-    }
-
-    // Add a new tile (2 or 4) to a random empty position
-    newTile(): boolean {
-      let empty: [number, number][] = [];
-      for (let i = 0; i < this.size; i++) {
-        for (let j = 0; j < this.size; j++) {
-          if (this.grid[i][j] === 0) empty.push([i, j]);
-        }
-      }
-      if (empty.length === 0) return false;
-      let [row, col] = empty[Math.floor(Math.random() * empty.length)];
-      this.grid[row][col] = Math.random() < 0.9 ? 2 : 4;
-      return true;
-    }
-
-    // Check if the game is over (no valid moves)
-    gameOver(): boolean {
-      if (this.numEmpty() > 0) return false;
-      for (let i = 0; i < this.size; i++) {
-        for (let j = 0; j < this.size - 1; j++) {
-          if (this.grid[i][j] === this.grid[i][j + 1]) return false;
-          if (this.grid[j][i] === this.grid[j + 1][i]) return false;
-        }
-      }
-      return true;
-    }
-
-    // Check if a move in the given direction is valid
-    validMove(direction: number): boolean {
-      let testBoard: Board2048 = new Board2048(this.grid.map(row => [...row]));
-      let result: ShiftResult = testBoard.shift(direction);
-      return result.changed;
-    }
-
-    // Getter for grid
-    getGrid(): Grid {
-      return this.grid;
-    }
+    return { line: result, changed };
   }
 
-  // Main Game Component
-  const App: React.FC = () => {
-    const [game, setGame] = useState<Board2048>(() => {
-      let board = new Board2048(4);
-      board.newTile();
-      board.newTile();
-      return board;
-    });
-    const [gameOver, setGameOver] = useState<boolean>(false);
+  shift(direction: number): ShiftResult {
+    let newBoard = new Board2048(this.grid.map(row => [...row]));
+    let changed = false;
 
-    // Handle keyboard input
-    useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        let direction: number | undefined;
-        switch (e.key.toLowerCase()) {
-          case 'w':
-            direction = Board2048.UP;
-            break;
-          case 'd':
-            direction = Board2048.RIGHT;
-            break;
-          case 's':
-            direction = Board2048.DOWN;
-            break;
-          case 'a':
-            direction = Board2048.LEFT;
-            break;
-          default:
-            return;
+    for (let i = 0; i < this.size; i++) {
+      const vertical = direction === Board2048.UP || direction === Board2048.DOWN;
+      const reverse = direction === Board2048.RIGHT || direction === Board2048.DOWN;
+      const line = newBoard.extractLine(i, vertical, reverse);
+      const result = Board2048.alterOneLine(line);
+      newBoard.insertLine(result.line, i, vertical, reverse);
+      if (result.changed) changed = true;
+    }
+
+    return { board: newBoard, changed };
+  }
+
+  numEmpty(): number {
+    return this.grid.flat().filter(val => val === 0).length;
+  }
+
+  newTile(): boolean {
+    const empty: [number, number][] = [];
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size; j++) {
+        if (this.grid[i][j] === 0) empty.push([i, j]);
+      }
+    }
+
+    if (empty.length === 0) return false;
+
+    const [row, col] = empty[Math.floor(Math.random() * empty.length)];
+    this.grid[row][col] = Math.random() < 0.9 ? 2 : 4;
+    return true;
+  }
+
+  gameOver(): boolean {
+    if (this.numEmpty() > 0) return false;
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size - 1; j++) {
+        if (this.grid[i][j] === this.grid[i][j + 1]) return false;
+        if (this.grid[j][i] === this.grid[j + 1][i]) return false;
+      }
+    }
+    return true;
+  }
+
+  validMove(direction: number): boolean {
+    const testBoard = new Board2048(this.grid.map(row => [...row]));
+    const result = testBoard.shift(direction);
+    return result.changed;
+  }
+
+  getGrid(): Grid {
+    return this.grid;
+  }
+}
+
+// React App Component
+const App: React.FC = () => {
+  const [game, setGame] = useState<Board2048>(() => {
+    const board = new Board2048(4);
+    board.newTile();
+    board.newTile();
+    return board;
+  });
+
+  const [gameOver, setGameOver] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      let direction: number | undefined;
+      switch (e.key.toLowerCase()) {
+        case 'w':
+        case 'arrowup':
+          direction = Board2048.UP;
+          break;
+        case 'd':
+        case 'arrowright':
+          direction = Board2048.RIGHT;
+          break;
+        case 's':
+        case 'arrowdown':
+          direction = Board2048.DOWN;
+          break;
+        case 'a':
+        case 'arrowleft':
+          direction = Board2048.LEFT;
+          break;
+        default:
+          return;
+      }
+
+      if (game.validMove(direction)) {
+        const { board } = game.shift(direction);
+        board.newTile();
+        setGame(board);
+        if (board.gameOver()) {
+          setGameOver(true);
         }
-
-        if (game.validMove(direction)) {
-          let { board }: ShiftResult = game.shift(direction);
-          board.newTile();
-          setGame(board);
-          if (board.gameOver()) {
-            setGameOver(true);
-          }
-        }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [game]);
-
-    // Reset game
-    const resetGame = (): void => {
-      let newBoard = new Board2048(4);
-      newBoard.newTile();
-      newBoard.newTile();
-      setGame(newBoard);
-      setGameOver(false);
+      }
     };
 
-    return (
-      <div className="container">
-        <main className="main">
-          <h1 className="title">2048 Puzzle</h1>
-          <div className="grid-container">
-            <div className="grid">
-              {game.getGrid().flat().map((value: number, index: number) => (
-                <div
-                  key={index}
-                  className={`tile tile-${value}`}
-                >
-                  {value !== 0 ? value : ''}
-                </div>
-              ))}
-            </div>
-          </div>
-          {gameOver && (
-            <div className="game-over">
-              Game Over!{' '}
-              <button onClick={resetGame}>
-                Play Again
-              </button>
-            </div>
-          )}
-          <div className="instructions">
-            Use <strong>WASD</strong> keys to move tiles (W: Up, A: Left, S: Down, D: Right).
-          </div>
-          <button
-            onClick={resetGame}
-            className="new-game-button"
-          >
-            New Game
-          </button>
-        </main>
-      </div>
-    );
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [game]);
+
+  const resetGame = (): void => {
+    const newBoard = new Board2048(4);
+    newBoard.newTile();
+    newBoard.newTile();
+    setGame(newBoard);
+    setGameOver(false);
   };
 
-  export default App;
+  return (
+    <div className="container">
+      <main className="main">
+        <h1 className="title">2048 Puzzle</h1>
+        <div className="grid-container">
+          <div className="grid">
+            {game.getGrid().flat().map((value, index) => (
+              <div key={index} className={`tile tile-${value}`}>
+                {value !== 0 ? value : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+        {gameOver && (
+          <div className="game-over">
+            Game Over!{' '}
+            <button onClick={resetGame}>
+              Play Again
+            </button>
+          </div>
+        )}
+        <div className="instructions">
+          Use <strong>WASD</strong> or <strong>Arrow Keys</strong> to move tiles.
+        </div>
+        <button onClick={resetGame} className="new-game-button">
+          New Game
+        </button>
+      </main>
+    </div>
+  );
+};
+
+export default App;
